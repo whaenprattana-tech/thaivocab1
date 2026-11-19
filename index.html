@@ -452,6 +452,34 @@
   </main>
 
   <script>
+    // ==================== ตัวเชื่อม GitHub Pages <-> Google Apps Script ====================
+    const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxEEylmn8dCbGnZ0-aI_HfXUekJVhb4Za44hBSeP343xkWxkP3-nQ1oMFfgiVhbeiI/exec';
+
+    if (typeof window.google === 'undefined' || !window.google.script) {
+      const createRunner = (onSuccess, onFailure) => new Proxy({}, {
+        get(_, prop) {
+          if (prop === 'withSuccessHandler') return (fn) => createRunner(fn, onFailure);
+          if (prop === 'withFailureHandler') return (fn) => createRunner(onSuccess, fn);
+          return (...args) => {
+            fetch(GAS_API_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ action: prop, args: args })
+            })
+            .then(res => res.json())
+            .then(data => {
+              if (data.status === 'error') throw new Error(data.message);
+              if (onSuccess) onSuccess(data.result);
+            })
+            .catch(err => {
+              console.error('GAS API Error:', err);
+              if (onFailure) onFailure(err);
+            });
+          };
+        }
+      });
+      window.google = { script: { run: createRunner(null, null) } };
+    }
     let appState = {
       words: [
         { id: 'W001', word: 'แม่น้ำ', reading: 'แม่-น้ำ', active: true },
