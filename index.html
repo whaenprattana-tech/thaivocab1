@@ -596,11 +596,13 @@
       } catch (e) {}
     }
 
-    function fetchServerData() {
+    function fetchServerData(showToast = false) {
       if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+      showSyncStatus('กำลังอัปเดตข้อมูลจากชีต...', true);
 
       google.script.run
         .withSuccessHandler((data) => {
+          showSyncStatus('', false);
           if (data) {
             appState.words = data.words || [];
             appState.students = data.students || [];
@@ -609,6 +611,12 @@
               appState.settings.appTitle = data.settings.appTitle || appState.settings.appTitle;
               appState.settings.adminPasscode = data.settings.adminPasscode || appState.settings.adminPasscode;
             }
+
+            // ถ้านักเรียนที่เลือกอยู่ถูกลบออกจากชีต ให้เด้งกลับหน้าเลือกรายชื่อ
+            if (appState.currentStudentId && !appState.students.some(s => s.id === appState.currentStudentId)) {
+              changeStudent();
+            }
+
             saveLocalCache();
             refreshAllViews();
             if (appState.currentStudentId) {
@@ -616,9 +624,19 @@
             }
           }
         })
-        .withFailureHandler(() => {})
+        .withFailureHandler((err) => {
+          showSyncStatus('', false);
+          console.error('ดึงข้อมูลจากชีตไม่สำเร็จ:', err);
+        })
         .getInitialData();
     }
+
+    // อัปเดตข้อมูลอัตโนมัติทุกครั้งที่สลับแท็บกลับมาจาก Google Sheets
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        fetchServerData();
+      }
+    });
 
     function applyAppTitle() {
       const title = appState.settings.appTitle || 'คลังอ่านคำพื้นฐาน โรงเรียนบ้านโพนก้างปลา';
